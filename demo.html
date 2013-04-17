@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Esoptimize Demo</title>
+    <style>
+      body {
+        font: 12px Lucida Grande, sans-serif;
+        margin: 0 auto;
+        padding: 50px;
+        max-width: 600px;
+      }
+
+      .CodeMirror {
+        border: 1px solid #DDD;
+        height: 200px !important;
+      }
+    </style>
+    <link rel="stylesheet" href="node_modules/codemirror/lib/codemirror.css">
+    <script src="node_modules/codemirror/lib/codemirror.js"></script>
+    <script src="node_modules/codemirror/mode/javascript/javascript.js"></script>
+    <script src="node_modules/escodegen/escodegen.browser.js"></script>
+    <script src="node_modules/estraverse/estraverse.js"></script>
+    <script src="node_modules/esprima/esprima.js"></script>
+    <script src="esoptimize.js"></script>
+  </head>
+  <body>
+    <h1>Esoptimize Demo</h1>
+    <p>
+      This is a demo of <a href="https://github.com/evanw/esoptimize">esoptimize</a>, a JavaScript AST optimizer.
+    </p>
+
+    <h2>Input</h2>
+    <textarea id="input" autofocus>var x = (100, 200 + 300 - 0.1);
+var y = { 1: [1, 2, 3][0], 2: x }[2];
+</textarea>
+
+    <h2>Output</h2>
+    <textarea id="output"></textarea>
+
+    <script>
+      var input = CodeMirror.fromTextArea(document.getElementById('input'), {
+        lineNumbers: true,
+        mode: 'javascript'
+      });
+
+      var output = CodeMirror.fromTextArea(document.getElementById('output'), {
+        lineNumbers: true,
+        readOnly: 'nocursor',
+        mode: 'javascript'
+      });
+
+      function update() {
+        try {
+          var node = esprima.parse(input.getValue());
+          node = esoptimize.optimize(node);
+          output.setValue(escodegen.generate(node));
+        } catch (e) {
+          output.setValue(e + '');
+        }
+      }
+
+      input.on('change', update);
+      update();
+    </script>
+  </body>
+</html>
