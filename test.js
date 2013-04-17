@@ -190,11 +190,27 @@ it('array folding', function() {
     var b = [1, c()][0];
     var c = [1, 2][-1];
     var d = [1, 2][0.5];
+    var e = [1, 2, 3]['len' + 'gth'];
   }, function() {
     var a = 1;
     var b = [1, c()][0];
     var c = [][-1];
     var d = [][0.5];
+    var e = 3;
+  });
+});
+
+it('string folding', function() {
+  test(function() {
+    var a = '12'[0];
+    var b = '12'[-1];
+    var c = '12'[0.5];
+    var d = '123'['len' + 'gth'];
+  }, function() {
+    var a = '1';
+    var b = ''[-1];
+    var c = ''[0.5];
+    var d = 3;
   });
 });
 

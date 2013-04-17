@@ -315,22 +315,62 @@
           }
         }
 
-        if (node.object.type === 'ArrayExpression' && typeof node.property.value === 'number') {
-          // Check for a match inside the array literal
-          var index = node.property.value >>> 0;
-          if (index === +node.property.value && index < node.object.elements.length) {
-            return node.object.elements[index];
+        if (node.object.type === 'Literal' && typeof node.object.value === 'string') {
+          if (node.property.value === 'length') {
+            return {
+              type: 'Literal',
+              value: node.object.value.length
+            };
           }
 
-          // Optimize to an empty array literal (may still be a numeric property on Array.prototype)
-          return {
-            type: 'MemberExpression',
-            computed: true,
-            object: {
-              type: 'ArrayExpression',
-              elements: []
-            },
-            property: node.property
+          if (typeof node.property.value === 'number') {
+            // Check for a match inside the string literal
+            var index = node.property.value >>> 0;
+            if (index === +node.property.value && index < node.object.value.length) {
+              return {
+                type: 'Literal',
+                value: node.object.value[index]
+              };
+            }
+
+            // Optimize to an empty string literal (may still be a numeric property on String.prototype)
+            return {
+              type: 'MemberExpression',
+              computed: true,
+              object: {
+                type: 'Literal',
+                value: ''
+              },
+              property: node.property
+            }
+          }
+        }
+
+        if (node.object.type === 'ArrayExpression') {
+          if (node.property.value === 'length') {
+            return {
+              type: 'Literal',
+              value: node.object.elements.length
+            };
+          }
+
+          if (typeof node.property.value === 'number') {
+            // Check for a match inside the array literal
+            var index = node.property.value >>> 0;
+            if (index === +node.property.value && index < node.object.elements.length) {
+              return node.object.elements[index];
+            }
+
+            // Optimize to an empty array literal (may still be a numeric property on Array.prototype)
+            return {
+              type: 'MemberExpression',
+              computed: true,
+              object: {
+                type: 'ArrayExpression',
+                elements: []
+              },
+              property: node.property
+            }
           }
         }
       }

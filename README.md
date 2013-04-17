@@ -4,7 +4,7 @@ Esoptimize is a JavaScript optimizer that is designed to work well with [esprima
 
 ### Usage
 
-Use esoptimize by calling `esoptimize.optimize(ast)` where `ast` is a JavaScript abstract syntax tree that conforms to the [SpiderMonkey Parser API](https://developer.mozilla.org/en-US/docs/SpiderMonkey/Parser_API) format.
+Esoptimize can be installed using `npm install esoptimize` and used by calling `esoptimize.optimize(ast)` where `ast` is a JavaScript abstract syntax tree that conforms to the [SpiderMonkey Parser API](https://developer.mozilla.org/en-US/docs/SpiderMonkey/Parser_API) format.
 
 ### Features
 
