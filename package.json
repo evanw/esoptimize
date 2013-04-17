@@ -1,6 +1,6 @@
 {
   "name": "esoptimize",
-  "description": "ECMAScript JS AST optimization",
+  "description": "A JavaScript AST optimizer",
   "main": "esoptimize.js",
   "version": "0.0.1",
   "repository": {
