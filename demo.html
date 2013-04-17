@@ -28,11 +28,11 @@
     <h1>Esoptimize Demo</h1>
     <p>
       This is a demo of <a href="https://github.com/evanw/esoptimize">esoptimize</a>, a JavaScript AST optimizer.
+      It performs constant folding and and dead code elimination.
     </p>
 
     <h2>Input</h2>
-    <textarea id="input" autofocus>var x = (100, 200 + 300 - 0.1);
-var y = { 1: [1, 2, 3][0], 2: x }[2];
+    <textarea id="input" autofocus>var x = [false, '1' - 0.1][0 + 1];
 </textarea>
 
     <h2>Output</h2>
@@ -54,7 +54,7 @@ var y = { 1: [1, 2, 3][0], 2: x }[2];
         try {
           var node = esprima.parse(input.getValue());
           node = esoptimize.optimize(node);
-          output.setValue(escodegen.generate(node));
+          output.setValue(escodegen.generate(node) + '\n');
         } catch (e) {
           output.setValue(e + '');
         }
