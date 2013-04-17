@@ -101,32 +101,28 @@
 
   var normalize = {
     leave: function(node) {
-      if (node.type === 'ObjectExpression') {
+      if (node.type === 'Property') {
+        assert(node.key.type === 'Literal' || node.key.type === 'Identifier');
         return {
-          type: 'ObjectExpression',
-          properties: node.properties.map(function(property) {
-            assert(property.key.type === 'Literal' || property.key.type === 'Identifier');
-            return {
-              key: {
-                type: 'Literal',
-                value: property.key.type === 'Literal' ? property.key.value + '' : property.key.name
-              },
-              value: property.value,
-              kind: property.kind
-            }
-          })
+          type: 'Property',
+          key: {
+            type: 'Literal',
+            value: node.key.type === 'Literal' ? node.key.value + '' : node.key.name
+          },
+          value: node.value,
+          kind: node.kind
         };
       }
 
       if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier') {
         return {
           type: 'MemberExpression',
+          computed: true,
           object: node.object,
           property: {
             type: 'Literal',
             value: node.property.name
-          },
-          computed: true
+          }
         };
       }
     }
@@ -204,30 +200,27 @@
         }
       }
 
-      if (node.type === 'ObjectExpression') {
+      if (node.type === 'Property') {
+        var key = node.key;
+        assert(key.type === 'Literal');
+        if (isValidIdentifier.test(key.value)) {
+          key = {
+            type: 'Identifier',
+            name: key.value
+          };
+        }
         return {
-          type: 'ObjectExpression',
-          properties: node.properties.map(function(property) {
-            var key = property.key;
-            assert(key.type === 'Literal');
-            if (isValidIdentifier.test(key.value)) {
-              key = {
-                type: 'Identifier',
-                name: key.value
-              };
-            }
-            return {
-              key: key,
-              value: property.value,
-              kind: property.kind
-            }
-          })
+          type: 'Property',
+          key: key,
+          value: node.value,
+          kind: node.kind
         };
       }
 
       if (node.type === 'MemberExpression' && node.computed && node.property.type === 'Literal' && isValidIdentifier.test(node.property.value)) {
         return {
           type: 'MemberExpression',
+          computed: false,
           object: node.object,
           property: {
             type: 'Identifier',
@@ -332,12 +325,12 @@
           // Optimize to an empty array literal (may still be a numeric property on Array.prototype)
           return {
             type: 'MemberExpression',
+            computed: true,
             object: {
               type: 'ArrayExpression',
               elements: []
             },
-            property: node.property,
-            computed: true
+            property: node.property
           }
         }
       }
@@ -392,13 +385,17 @@
         };
       }
 
-      if (node.type === 'BlockStatement') {
+      if (node.type === 'BlockStatement' && (!parent || (parent.type !== 'FunctionExpression' && parent.type !== 'FunctionDeclaration'))) {
         var body = flattenNodeList(filterDeadCode(node.body));
 
         if (body.length === 0) {
           return {
             type: 'EmptyStatement'
           };
+        }
+
+        if (body.length === 1) {
+          return body[0];
         }
 
         return {
@@ -419,7 +416,7 @@
           };
         }
 
-        if (node.alternate.type === 'EmptyStatement') {
+        if (node.alternate !== null && node.alternate.type === 'EmptyStatement') {
           return {
             type: 'IfStatement',
             test: node.test,
@@ -431,11 +428,31 @@
     }
   };
 
+  var parent = null;
+
+  // Wrap the visitor in a visitor that ensures parent is set correctly
+  function replaceWithParent(node, visitor) {
+    var stack = [];
+    return estraverse.replace(node, {
+      enter: function(node) {
+        if (visitor.enter) node = visitor.enter(node) || node;
+        stack.push(parent);
+        parent = node;
+        return node;
+      },
+      leave: function(node) {
+        parent = stack.pop();
+        if (visitor.leave) node = visitor.leave(node) || node;
+        return node;
+      }
+    });
+  }
+
   function optimize(node) {
-    node = estraverse.replace(node, normalize);
-    node = estraverse.replace(node, foldConstants);
-    node = estraverse.replace(node, removeDeadCode);
-    node = estraverse.replace(node, denormalize);
+    node = replaceWithParent(node, normalize);
+    node = replaceWithParent(node, foldConstants);
+    node = replaceWithParent(node, removeDeadCode);
+    node = replaceWithParent(node, denormalize);
     return node;
   }
 

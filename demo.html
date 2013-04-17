@@ -8,12 +8,31 @@
         font: 12px Lucida Grande, sans-serif;
         margin: 0 auto;
         padding: 50px;
-        max-width: 600px;
+        max-width: 1000px;
+      }
+
+      table {
+        margin-top: 50px;
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      td {
+        width: 50%;
+      }
+
+      td:first-child {
+        padding-right: 25px;
+      }
+
+      td:last-child {
+        padding-left: 25px;
       }
 
       .CodeMirror {
         border: 1px solid #DDD;
-        height: 200px !important;
+        width: 475px !important;
+        height: 400px !important;
       }
     </style>
     <link rel="stylesheet" href="node_modules/codemirror/lib/codemirror.css">
@@ -28,23 +47,32 @@
     <h1>Esoptimize Demo</h1>
     <p>
       This is a demo of <a href="https://github.com/evanw/esoptimize">esoptimize</a>, a JavaScript AST optimizer.
-      It performs constant folding and and dead code elimination.
+      It performs constant folding and dead code elimination.
     </p>
 
-    <h2>Input</h2>
-    <textarea id="input" autofocus>var x = [false, '1' - 0.1][0 + 1];
+    <table>
+      <tr>
+        <td>
+          <h2>Input</h2>
+          <textarea id="input" autofocus>var x = [false, '1' - 0.1][0 + 1];
 </textarea>
-
-    <h2>Output</h2>
-    <textarea id="output"></textarea>
+        </td>
+        <td>
+          <h2>Output</h2>
+          <textarea id="output"></textarea>
+        </td>
+      </tr>
+    </table>
 
     <script>
       var input = CodeMirror.fromTextArea(document.getElementById('input'), {
+        lineWrapping: true,
         lineNumbers: true,
         mode: 'javascript'
       });
 
       var output = CodeMirror.fromTextArea(document.getElementById('output'), {
+        lineWrapping: true,
         lineNumbers: true,
         readOnly: 'nocursor',
         mode: 'javascript'
@@ -54,9 +82,9 @@
         try {
           var node = esprima.parse(input.getValue());
           node = esoptimize.optimize(node);
-          output.setValue(escodegen.generate(node) + '\n');
+          output.setValue(escodegen.generate(node, { format: { indent: { style: '  ' } } }) + '\n');
         } catch (e) {
-          output.setValue(e + '');
+          output.setValue(e.stack + '');
         }
       }
 

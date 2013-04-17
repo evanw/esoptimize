@@ -10,9 +10,10 @@ function bodyOfFunction(f) {
 function test(input, expected) {
   input = esprima.parse(bodyOfFunction(input));
   expected = esprima.parse(bodyOfFunction(expected));
-  assert.strictEqual(
-    escodegen.generate(esoptimize.optimize(input)),
-    escodegen.generate(expected));
+  var output = esoptimize.optimize(input);
+  var options = { format: { indent: { style: '  ' } } };
+  assert.strictEqual(escodegen.generate(output, options), escodegen.generate(expected, options));
+  assert.strictEqual(JSON.stringify(output, null, 2), JSON.stringify(expected, null, 2));
 }
 
 it('numeric constants', function() {
@@ -229,8 +230,12 @@ it('side-effect-free code removal', function() {
     (function() {});
     'use strict';
     'not use strict';
+    var foo = function() {};
+    function foo() {}
   }, function() {
     'use strict';
+    var foo = function() {};
+    function foo() {}
   });
 });
 
@@ -260,10 +265,12 @@ it('ternary expression folding', function() {
 
 it('remove empty if body', function() {
   test(function() {
+    if (a()) { b(); } else {}
     if (a()) { 1; }
-    if (b()) { 1; } else { 2; }
+    if (a()) { 1; } else { 2; }
   }, function() {
+    if (a()) b();
     a();
-    b();
+    a();
   });
 });
