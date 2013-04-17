@@ -257,17 +257,43 @@ it('side-effect-free code removal', function() {
 
 it('block flattening', function() {
   test(function() {
+    var x, y;
     a();
     ;
     { ; b(); { c(); } d(), e(); }
     f();
   }, function() {
+    var x;
+    var y;
     a();
     b();
     c();
     d();
     e();
     f();
+  });
+});
+
+it('function block flattening', function() {
+  test(function() {
+    function foo() {
+      var x, y;
+      a();
+      ;
+      { ; b(); { c(); } d(), e(); }
+      f();
+    }
+  }, function() {
+    function foo() {
+      var x;
+      var y;
+      a();
+      b();
+      c();
+      d();
+      e();
+      f();
+    }
   });
 });
 

@@ -399,6 +399,16 @@
         return node.body;
       }
 
+      if (node.type === 'VariableDeclaration') {
+        return node.declarations.map(function(decl) {
+          return {
+            type: 'VariableDeclaration',
+            declarations: [decl],
+            kind: node.kind
+          }
+        });
+      }
+
       if (node.type === 'ExpressionStatement' && node.expression.type === 'SequenceExpression') {
         return flattenNodeList(node.expression.expressions).map(function(node) {
           return {
@@ -425,17 +435,19 @@
         };
       }
 
-      if (node.type === 'BlockStatement' && (!parent || (parent.type !== 'FunctionExpression' && parent.type !== 'FunctionDeclaration'))) {
+      if (node.type === 'BlockStatement') {
         var body = flattenNodeList(filterDeadCode(node.body));
 
-        if (body.length === 0) {
-          return {
-            type: 'EmptyStatement'
-          };
-        }
+        if (!parent || (parent.type !== 'FunctionExpression' && parent.type !== 'FunctionDeclaration')) {
+          if (body.length === 0) {
+            return {
+              type: 'EmptyStatement'
+            };
+          }
 
-        if (body.length === 1) {
-          return body[0];
+          if (body.length === 1) {
+            return body[0];
+          }
         }
 
         return {
