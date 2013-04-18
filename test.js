@@ -264,13 +264,11 @@ it('side-effect-free code removal', function() {
 
 it('block flattening', function() {
   test(function() {
-    var x, y;
     a();
     ;
     { ; b(); { c(); } d(), e(); }
     f();
   }, function() {
-    var x, y;
     a();
     b();
     c();
@@ -283,16 +281,13 @@ it('block flattening', function() {
 it('function block flattening', function() {
   test(function() {
     function foo(a, b) {
-      var x, y;
       a();
       ;
       { ; b(); { c(); } d(), e(); }
       f();
     }
   }, function() {
-    var foo;
     function foo(a, b) {
-      var x, y;
       a();
       b();
       c();
@@ -300,6 +295,25 @@ it('function block flattening', function() {
       e();
       f();
     }
+  });
+});
+
+it('unused variable removal', function() {
+  test(function() {
+    var a, b;
+    function foo(a) {
+      var a, b, c;
+      a(); b();
+    }
+    b = 0;
+  }, function() {
+    var b;
+    function foo(a) {
+      var b;
+      a();
+      b();
+    }
+    b = 0;
   });
 });
 

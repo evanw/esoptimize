@@ -1,7 +1,7 @@
 (function() {
   'use strict';
 
-  var escope = typeof window !== 'undefined' ? window.escope : require('escope');
+  var esscope = typeof window !== 'undefined' ? window.esscope : require('./esscope');
   var estraverse = typeof window !== 'undefined' ? window.estraverse : require('estraverse');
   var esoptimize = typeof window !== 'undefined' ? (window.esoptimize = {}) : exports;
 
@@ -105,12 +105,18 @@
 
   function declareScopeVariables() {
     var variables = scope.variables;
-    var node = scope.block;
+    var node = scope.node;
+
+    variables = variables.filter(function(variable) {
+      return variable.references.some(function(reference) {
+        return reference.type === 'VariableDeclaration';
+      });
+    });
 
     if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
       variables = variables.filter(function(variable) {
-        return variable.name !== 'arguments' && node.params.every(function(param) {
-          return param.name !== variable.name;
+        return variable.references.every(function(reference) {
+          return reference.type !== 'ArgumentDeclaration';
         });
       });
     }
@@ -682,27 +688,32 @@
             };
           }
         }
+
+        if (node.type === 'VariableDeclaration') {
+          return {
+            type: 'VariableDeclaration',
+            declarations: node.declarations.filter(function(node) {
+              var variable = scope.variableForName(node.id.name);
+              assert(variable !== null);
+              return variable.references.length > 1;
+            }),
+            kind: node.kind
+          };
+        }
       }
     });
   }
 
   function wrappedReplace(node, visitor) {
-    var scopeStack = [];
     var parentStack = [];
-    var scopes = escope.analyze(node).scopes;
+    var globalScope = esscope.analyze(node);
 
     // Wrap the given visitor with a visitor that ensures parent and scope are set correctly
     return estraverse.replace(node, {
       enter: function(node) {
-        scopeStack.push(scope);
-        if (escope.Scope.isScopeRequired(node)) {
-          for (var i = 0; i < scopes.length; i++) {
-            if (scopes[i].block === node) {
-              scope = scopes[i];
-              break;
-            }
-          }
-          assert(i < scopes.length);
+        if (esscope.nodeStartsNewScope(node)) {
+          scope = scope === null ? globalScope : scope.childScopeForNode(node);
+          assert(scope !== null);
         }
         if (visitor.enter) {
           node = visitor.enter(node) || node;
@@ -717,7 +728,9 @@
         if (visitor.leave) {
           node = visitor.leave(node) || node;
         }
-        scope = scopeStack.pop();
+        if (esscope.nodeStartsNewScope(node)) {
+          scope = scope.parentScope;
+        }
         return node;
       }
     });
