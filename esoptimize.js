@@ -109,14 +109,14 @@
 
     variables = variables.filter(function(variable) {
       return variable.references.some(function(reference) {
-        return reference.type === 'VariableDeclaration';
+        return reference.declarationNode !== null && reference.declarationNode.type === 'VariableDeclarator';
       });
     });
 
     if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
       variables = variables.filter(function(variable) {
         return variable.references.every(function(reference) {
-          return reference.type !== 'ArgumentDeclaration';
+          return node.params.indexOf(reference.node) === -1;
         });
       });
     }
