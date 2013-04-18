@@ -144,7 +144,7 @@
   }
 
   function normalize(node) {
-    return wrappedReplace(node, {
+    return estraverse.replace(node, wrapVisitorScope({
       leave: function(node) {
         // Hoist global variables
         if (node.type === 'Program') {
@@ -236,11 +236,11 @@
           };
         }
       }
-    });
+    }));
   }
 
   function denormalize(node) {
-    return wrappedReplace(node, {
+    return estraverse.replace(node, {
       leave: function(node) {
         if (node.type === 'Literal') {
           if (node.value === void 0) {
@@ -345,7 +345,7 @@
   }
 
   function foldConstants(node) {
-    return wrappedReplace(node, {
+    return estraverse.replace(node, {
       enter: function(node) {
         if (node.type === 'UnaryExpression' && node.operator === '!') {
           if (node.argument.type === 'BinaryExpression' && node.argument.operator in oppositeOperator) {
@@ -559,8 +559,14 @@
     return nodes;
   }
 
+  function canRemoveVariable(name) {
+    var variable = scope.variableForName(name);
+    assert(variable !== null);
+    return !variable.isGlobal() && (!variable.isReadFrom() || !variable.isWrittenTo());
+  }
+
   function removeDeadCode(node) {
-    return wrappedReplace(node, {
+    return estraverse.replace(node, wrapVisitorScope(wrapVisitorParent({
       leave: function(node) {
         if (node.type === 'Program') {
           return {
@@ -689,35 +695,35 @@
           }
         }
 
+        if (node.type === 'Identifier' && canRemoveVariable(node.name) && parent.type !== 'VariableDeclarator') {
+          return {
+            type: 'Literal',
+            value: void 0
+          };
+        }
+
+        if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier' && canRemoveVariable(node.left.name)) {
+          return node.right;
+        }
+
         if (node.type === 'VariableDeclaration') {
           return {
             type: 'VariableDeclaration',
             declarations: node.declarations.filter(function(node) {
-              var variable = scope.variableForName(node.id.name);
-              assert(variable !== null);
-              return variable.references.length > 1;
+              return !canRemoveVariable(node.id.name);
             }),
             kind: node.kind
           };
         }
       }
-    });
+    })));
   }
 
-  function wrappedReplace(node, visitor) {
+  function wrapVisitorParent(visitor) {
     var parentStack = [];
-    var globalScope = esscope.analyze(node);
-
-    // Wrap the given visitor with a visitor that ensures parent and scope are set correctly
-    return estraverse.replace(node, {
+    return {
       enter: function(node) {
-        if (esscope.nodeStartsNewScope(node)) {
-          scope = scope === null ? globalScope : scope.childScopeForNode(node);
-          assert(scope !== null);
-        }
-        if (visitor.enter) {
-          node = visitor.enter(node) || node;
-        }
+        if (visitor.enter) node = visitor.enter(node) || node;
         parentStack.push(parent);
         parent = node;
         return node;
@@ -725,15 +731,29 @@
 
       leave: function(node) {
         parent = parentStack.pop();
-        if (visitor.leave) {
-          node = visitor.leave(node) || node;
-        }
-        if (esscope.nodeStartsNewScope(node)) {
-          scope = scope.parentScope;
-        }
+        if (visitor.leave) node = visitor.leave(node) || node;
         return node;
       }
-    });
+    };
+  }
+
+  function wrapVisitorScope(visitor) {
+    return {
+      enter: function(node) {
+        if (esscope.nodeStartsNewScope(node)) {
+          scope = scope === null ? esscope.analyze(node) : scope.childScopeForNode(node);
+          assert(scope !== null);
+        }
+        if (visitor.enter) node = visitor.enter(node) || node;
+        return node;
+      },
+
+      leave: function(node) {
+        if (visitor.leave) node = visitor.leave(node) || node;
+        if (esscope.nodeStartsNewScope(node)) scope = scope.parentScope;
+        return node;
+      }
+    };
   }
 
   function optimize(node) {

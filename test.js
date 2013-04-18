@@ -307,11 +307,10 @@ it('unused variable removal', function() {
     }
     b = 0;
   }, function() {
-    var b;
+    var a, b;
     function foo(a) {
-      var b;
       a();
-      b();
+      (void 0)();
     }
     b = 0;
   });

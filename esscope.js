@@ -16,6 +16,28 @@
     this.references = [];
   }
 
+  Variable.prototype.isGlobal = function() {
+    return this.scope.parentScope === null;
+  };
+
+  Variable.prototype.isCaptured = function() {
+    return this.references.some(function(reference) {
+      return reference.scope !== this.scope;
+    }, this);
+  };
+
+  Variable.prototype.isReadFrom = function() {
+    return this.references.some(function(reference) {
+      return reference.isRead;
+    });
+  };
+
+  Variable.prototype.isWrittenTo = function() {
+    return this.references.some(function(reference) {
+      return reference.isWrite;
+    });
+  };
+
   function Reference(node, scope) {
     this.node = node;
     this.scope = scope;
@@ -121,7 +143,7 @@
           reference.declarationNode = parent;
         }
 
-        else if (parent.type === 'AssignExpression' && parent.left === node) {
+        else if (parent.type === 'AssignmentExpression' && parent.left === node) {
           reference.isWrite = true;
 
           if (parent.operator !== '=') {
@@ -156,7 +178,9 @@
         leave(node);
         if (nodeStartsNewScope(node)) {
           currentResolver.close();
-          if (node.type !== 'Program') currentResolver = currentResolver.parentResolver;
+          if (currentResolver.parentResolver !== null) {
+            currentResolver = currentResolver.parentResolver;
+          }
         }
       }
     });
