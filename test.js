@@ -337,6 +337,16 @@ it('while statement dead code removal', function() {
   });
 });
 
+it('do-while statement dead code removal', function() {
+  test(function() {
+    do foo(); while (false);
+    do foo(); while (true);
+  }, function() {
+    foo();
+    do foo(); while (true);
+  });
+});
+
 it('for statement dead code removal', function() {
   test(function() {
     for (;0;) foo();
@@ -360,5 +370,35 @@ it('with statement dead code removal', function() {
     with (foo) foo();
   }, function() {
     with (foo) foo();
+  });
+});
+
+it('try statement dead code removal', function() {
+  test(function() {
+    try { foo(); } catch (e) { foo(); } finally { foo(); }
+    try { foo(); } catch (e) { foo(); } finally {}
+    try { foo(); } catch (e) { foo(); }
+    try { foo(); } catch (e) {} finally { foo(); }
+    try { foo(); } catch (e) {} finally {}
+    try { foo(); } catch (e) {}
+    try { foo(); } finally { foo(); }
+    try { foo(); } finally {}
+    try {} catch (e) { foo(); } finally { foo(); }
+    try {} catch (e) { foo(); } finally {}
+    try {} catch (e) { foo(); }
+    try {} catch (e) {} finally { foo(); }
+    try {} catch (e) {} finally {}
+    try {} catch (e) {}
+    try {} finally { foo(); }
+    try {} finally {}
+  }, function() {
+    try { foo(); } catch (e) { foo(); } finally { foo(); }
+    try { foo(); } catch (e) { foo(); }
+    try { foo(); } catch (e) { foo(); }
+    try { foo(); } finally { foo(); }
+    foo();
+    foo();
+    try { foo(); } finally { foo(); }
+    foo();
   });
 });
