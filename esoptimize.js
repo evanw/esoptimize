@@ -100,7 +100,7 @@
     return true;
   }
 
-  function declareScopeVariables(node) {
+  function declareScopeVariables(scopes, node) {
     for (var i = 0; i < scopes.length; i++) {
       if (scopes[i].block === node) {
         var variables = scopes[i].variables;
@@ -138,348 +138,355 @@
     assert(false);
   }
 
-  var normalize = {
-    leave: function(node) {
-      // Hoist global variables
-      if (node.type === 'Program') {
-        return {
-          type: 'Program',
-          body: [declareScopeVariables(node)].concat(node.body)
-        };
-      }
-
-      // Hoist local variables
-      if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
-        return {
-          type: node.type,
-          id: node.id,
-          params: node.params,
-          defaults: node.defaults,
-          body: {
-            type: 'BlockStatement',
-            body: [declareScopeVariables(node)].concat(node.body.body)
-          },
-          rest: node.rest,
-          generator: node.generator,
-          expression: node.expression
-        };
-      }
-
-      if (node.type === 'Property') {
-        assert(node.key.type === 'Literal' || node.key.type === 'Identifier');
-        return {
-          type: 'Property',
-          key: {
-            type: 'Literal',
-            value: node.key.type === 'Literal' ? node.key.value + '' : node.key.name
-          },
-          value: node.value,
-          kind: node.kind
-        };
-      }
-
-      if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier') {
-        return {
-          type: 'MemberExpression',
-          computed: true,
-          object: node.object,
-          property: {
-            type: 'Literal',
-            value: node.property.name
-          }
-        };
-      }
-
-      if (node.type === 'VariableDeclaration') {
-        var expressions = node.declarations.filter(function(node) {
-          return node.init !== null;
-        }).map(function(node) {
+  function normalize(node) {
+    var scopes = escope.analyze(node).scopes;
+    return replaceWithParent(node, {
+      leave: function(node) {
+        // Hoist global variables
+        if (node.type === 'Program') {
           return {
-            type: 'AssignmentExpression',
-            operator: '=',
-            left: node.id,
-            right: node.init
-          }
-        });
-
-        if (expressions.length === 0) {
-          return {
-            type: 'EmptyStatement'
+            type: 'Program',
+            body: [declareScopeVariables(scopes, node)].concat(node.body)
           };
         }
 
-        return {
-          type: 'ExpressionStatement',
-          expression: {
-            type: 'SequenceExpression',
-            expressions: expressions
-          }
-        };
-      }
-
-      if (node.type === 'ForStatement' && node.init !== null) {
-        return {
-          type: 'ForStatement',
-          init:
-            node.init.type === 'EmptyStatement' ? null :
-            node.init.type === 'ExpressionStatement' ? node.init.expression :
-            node.init,
-          test: node.test,
-          update: node.update,
-          body: node.body
-        };
-      }
-    }
-  };
-
-  var denormalize = {
-    leave: function(node) {
-      if (node.type === 'Literal') {
-        if (node.value === void 0) {
+        // Hoist local variables
+        if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
           return {
-            type: 'UnaryExpression',
-            operator: 'void',
-            argument: {
+            type: node.type,
+            id: node.id,
+            params: node.params,
+            defaults: node.defaults,
+            body: {
+              type: 'BlockStatement',
+              body: [declareScopeVariables(scopes, node)].concat(node.body.body)
+            },
+            rest: node.rest,
+            generator: node.generator,
+            expression: node.expression
+          };
+        }
+
+        if (node.type === 'Property') {
+          assert(node.key.type === 'Literal' || node.key.type === 'Identifier');
+          return {
+            type: 'Property',
+            key: {
               type: 'Literal',
-              value: 0
+              value: node.key.type === 'Literal' ? node.key.value + '' : node.key.name
+            },
+            value: node.value,
+            kind: node.kind
+          };
+        }
+
+        if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier') {
+          return {
+            type: 'MemberExpression',
+            computed: true,
+            object: node.object,
+            property: {
+              type: 'Literal',
+              value: node.property.name
             }
           };
         }
 
-        if (typeof node.value === 'number') {
-          if (isNaN(node.value)) {
+        if (node.type === 'VariableDeclaration') {
+          var expressions = node.declarations.filter(function(node) {
+            return node.init !== null;
+          }).map(function(node) {
             return {
-              type: 'BinaryExpression',
-              operator: '/',
-              left: {
-                type: 'Literal',
-                value: 0
-              },
-              right: {
+              type: 'AssignmentExpression',
+              operator: '=',
+              left: node.id,
+              right: node.init
+            }
+          });
+
+          if (expressions.length === 0) {
+            return {
+              type: 'EmptyStatement'
+            };
+          }
+
+          return {
+            type: 'ExpressionStatement',
+            expression: {
+              type: 'SequenceExpression',
+              expressions: expressions
+            }
+          };
+        }
+
+        if (node.type === 'ForStatement' && node.init !== null) {
+          return {
+            type: 'ForStatement',
+            init:
+              node.init.type === 'EmptyStatement' ? null :
+              node.init.type === 'ExpressionStatement' ? node.init.expression :
+              node.init,
+            test: node.test,
+            update: node.update,
+            body: node.body
+          };
+        }
+      }
+    });
+  }
+
+  function denormalize(node) {
+    return replaceWithParent(node, {
+      leave: function(node) {
+        if (node.type === 'Literal') {
+          if (node.value === void 0) {
+            return {
+              type: 'UnaryExpression',
+              operator: 'void',
+              argument: {
                 type: 'Literal',
                 value: 0
               }
-            }
+            };
           }
 
-          if (!isFinite(node.value)) {
-            return {
-              type: 'BinaryExpression',
-              operator: '/',
-              left: node.value < 0 ? {
+          if (typeof node.value === 'number') {
+            if (isNaN(node.value)) {
+              return {
+                type: 'BinaryExpression',
+                operator: '/',
+                left: {
+                  type: 'Literal',
+                  value: 0
+                },
+                right: {
+                  type: 'Literal',
+                  value: 0
+                }
+              }
+            }
+
+            if (!isFinite(node.value)) {
+              return {
+                type: 'BinaryExpression',
+                operator: '/',
+                left: node.value < 0 ? {
+                  type: 'UnaryExpression',
+                  operator: '-',
+                  argument: {
+                    type: 'Literal',
+                    value: 1
+                  }
+                } : {
+                  type: 'Literal',
+                  value: 1
+                },
+                right: {
+                  type: 'Literal',
+                  value: 0
+                }
+              }
+            }
+
+            if (node.value < 0) {
+              return {
                 type: 'UnaryExpression',
                 operator: '-',
                 argument: {
                   type: 'Literal',
-                  value: 1
+                  value: -node.value
                 }
-              } : {
-                type: 'Literal',
-                value: 1
-              },
-              right: {
-                type: 'Literal',
-                value: 0
-              }
-            }
-          }
-
-          if (node.value < 0) {
-            return {
-              type: 'UnaryExpression',
-              operator: '-',
-              argument: {
-                type: 'Literal',
-                value: -node.value
-              }
-            };
-          }
-
-          if (node.value === 0 && 1 / node.value < 0) {
-            return {
-              type: 'Literal',
-              value: 0
-            };
-          }
-        }
-      }
-
-      if (node.type === 'Property') {
-        var key = node.key;
-        assert(key.type === 'Literal');
-        if (isValidIdentifier.test(key.value)) {
-          key = {
-            type: 'Identifier',
-            name: key.value
-          };
-        }
-        return {
-          type: 'Property',
-          key: key,
-          value: node.value,
-          kind: node.kind
-        };
-      }
-
-      if (node.type === 'MemberExpression' && node.computed && node.property.type === 'Literal' && isValidIdentifier.test(node.property.value)) {
-        return {
-          type: 'MemberExpression',
-          computed: false,
-          object: node.object,
-          property: {
-            type: 'Identifier',
-            name: node.property.value
-          }
-        };
-      }
-    }
-  };
-
-  var foldConstants = {
-    enter: function(node) {
-      if (node.type === 'UnaryExpression' && node.operator === '!') {
-        if (node.argument.type === 'BinaryExpression' && node.argument.operator in oppositeOperator) {
-          return {
-            type: 'BinaryExpression',
-            operator: oppositeOperator[node.argument.operator],
-            left: node.argument.left,
-            right: node.argument.right
-          };
-        }
-
-        if (node.argument.type === 'LogicalExpression' && node.argument.operator in oppositeOperator) {
-          return {
-            type: 'LogicalExpression',
-            operator: oppositeOperator[node.argument.operator],
-            left: {
-              type: 'UnaryExpression',
-              operator: '!',
-              argument: node.argument.left
-            },
-            right: {
-              type: 'UnaryExpression',
-              operator: '!',
-              argument: node.argument.right
-            }
-          };
-        }
-      }
-    },
-
-    leave: function(node) {
-      if (node.type === 'SequenceExpression') {
-        var expressions = node.expressions;
-
-        expressions = Array.prototype.concat.apply([], expressions.map(function(node) {
-          return node.type === 'SequenceExpression' ? node.expressions : node;
-        }));
-
-        expressions = expressions.slice(0, -1).filter(hasSideEffects).concat(expressions.slice(-1));
-
-        if (expressions.length > 1) {
-          return {
-            type: 'SequenceExpression',
-            expressions: expressions
-          };
-        }
-
-        return expressions[0];
-      }
-
-      if (node.type === 'UnaryExpression' && node.argument.type === 'Literal') {
-        var operator = new Function('a', 'return ' + node.operator + ' a;');
-        return {
-          type: 'Literal',
-          value: operator(node.argument.value)
-        }
-      }
-
-      if ((node.type === 'BinaryExpression' || node.type === 'LogicalExpression') && node.left.type === 'Literal' && node.right.type === 'Literal') {
-        var operator = new Function('a', 'b', 'return a ' + node.operator + ' b;');
-        return {
-          type: 'Literal',
-          value: operator(node.left.value, node.right.value)
-        };
-      }
-
-      if (node.type === 'ConditionalExpression' && node.test.type === 'Literal') {
-        return node.test.value ? node.consequent : node.alternate;
-      }
-
-      if (node.type === 'MemberExpression' && node.property.type === 'Literal' && !hasSideEffects(node.object)) {
-        assert(node.computed);
-
-        if (node.object.type === 'ObjectExpression') {
-          for (var i = 0; i < node.object.properties.length; i++) {
-            var property = node.object.properties[i];
-            assert(property.key.type === 'Literal' && typeof property.key.value === 'string');
-            if (property.key.value === node.property.value + '') {
-              return property.value;
-            }
-          }
-        }
-
-        if (node.object.type === 'Literal' && typeof node.object.value === 'string') {
-          if (node.property.value === 'length') {
-            return {
-              type: 'Literal',
-              value: node.object.value.length
-            };
-          }
-
-          if (typeof node.property.value === 'number') {
-            // Check for a match inside the string literal
-            var index = node.property.value >>> 0;
-            if (index === +node.property.value && index < node.object.value.length) {
-              return {
-                type: 'Literal',
-                value: node.object.value[index]
               };
             }
 
-            // Optimize to an empty string literal (may still be a numeric property on String.prototype)
-            return {
-              type: 'MemberExpression',
-              computed: true,
-              object: {
+            if (node.value === 0 && 1 / node.value < 0) {
+              return {
                 type: 'Literal',
-                value: ''
-              },
-              property: node.property
+                value: 0
+              };
             }
           }
         }
 
-        if (node.object.type === 'ArrayExpression') {
-          if (node.property.value === 'length') {
+        if (node.type === 'Property') {
+          var key = node.key;
+          assert(key.type === 'Literal');
+          if (isValidIdentifier.test(key.value)) {
+            key = {
+              type: 'Identifier',
+              name: key.value
+            };
+          }
+          return {
+            type: 'Property',
+            key: key,
+            value: node.value,
+            kind: node.kind
+          };
+        }
+
+        if (node.type === 'MemberExpression' && node.computed && node.property.type === 'Literal' && isValidIdentifier.test(node.property.value)) {
+          return {
+            type: 'MemberExpression',
+            computed: false,
+            object: node.object,
+            property: {
+              type: 'Identifier',
+              name: node.property.value
+            }
+          };
+        }
+      }
+    });
+  }
+
+  function foldConstants(node) {
+    return replaceWithParent(node, {
+      enter: function(node) {
+        if (node.type === 'UnaryExpression' && node.operator === '!') {
+          if (node.argument.type === 'BinaryExpression' && node.argument.operator in oppositeOperator) {
             return {
-              type: 'Literal',
-              value: node.object.elements.length
+              type: 'BinaryExpression',
+              operator: oppositeOperator[node.argument.operator],
+              left: node.argument.left,
+              right: node.argument.right
             };
           }
 
-          if (typeof node.property.value === 'number') {
-            // Check for a match inside the array literal
-            var index = node.property.value >>> 0;
-            if (index === +node.property.value && index < node.object.elements.length) {
-              return node.object.elements[index];
+          if (node.argument.type === 'LogicalExpression' && node.argument.operator in oppositeOperator) {
+            return {
+              type: 'LogicalExpression',
+              operator: oppositeOperator[node.argument.operator],
+              left: {
+                type: 'UnaryExpression',
+                operator: '!',
+                argument: node.argument.left
+              },
+              right: {
+                type: 'UnaryExpression',
+                operator: '!',
+                argument: node.argument.right
+              }
+            };
+          }
+        }
+      },
+
+      leave: function(node) {
+        if (node.type === 'SequenceExpression') {
+          var expressions = node.expressions;
+
+          expressions = Array.prototype.concat.apply([], expressions.map(function(node) {
+            return node.type === 'SequenceExpression' ? node.expressions : node;
+          }));
+
+          expressions = expressions.slice(0, -1).filter(hasSideEffects).concat(expressions.slice(-1));
+
+          if (expressions.length > 1) {
+            return {
+              type: 'SequenceExpression',
+              expressions: expressions
+            };
+          }
+
+          return expressions[0];
+        }
+
+        if (node.type === 'UnaryExpression' && node.argument.type === 'Literal') {
+          var operator = new Function('a', 'return ' + node.operator + ' a;');
+          return {
+            type: 'Literal',
+            value: operator(node.argument.value)
+          }
+        }
+
+        if ((node.type === 'BinaryExpression' || node.type === 'LogicalExpression') && node.left.type === 'Literal' && node.right.type === 'Literal') {
+          var operator = new Function('a', 'b', 'return a ' + node.operator + ' b;');
+          return {
+            type: 'Literal',
+            value: operator(node.left.value, node.right.value)
+          };
+        }
+
+        if (node.type === 'ConditionalExpression' && node.test.type === 'Literal') {
+          return node.test.value ? node.consequent : node.alternate;
+        }
+
+        if (node.type === 'MemberExpression' && node.property.type === 'Literal' && !hasSideEffects(node.object)) {
+          assert(node.computed);
+
+          if (node.object.type === 'ObjectExpression') {
+            for (var i = 0; i < node.object.properties.length; i++) {
+              var property = node.object.properties[i];
+              assert(property.key.type === 'Literal' && typeof property.key.value === 'string');
+              if (property.key.value === node.property.value + '') {
+                return property.value;
+              }
+            }
+          }
+
+          if (node.object.type === 'Literal' && typeof node.object.value === 'string') {
+            if (node.property.value === 'length') {
+              return {
+                type: 'Literal',
+                value: node.object.value.length
+              };
             }
 
-            // Optimize to an empty array literal (may still be a numeric property on Array.prototype)
-            return {
-              type: 'MemberExpression',
-              computed: true,
-              object: {
-                type: 'ArrayExpression',
-                elements: []
-              },
-              property: node.property
+            if (typeof node.property.value === 'number') {
+              // Check for a match inside the string literal
+              var index = node.property.value >>> 0;
+              if (index === +node.property.value && index < node.object.value.length) {
+                return {
+                  type: 'Literal',
+                  value: node.object.value[index]
+                };
+              }
+
+              // Optimize to an empty string literal (may still be a numeric property on String.prototype)
+              return {
+                type: 'MemberExpression',
+                computed: true,
+                object: {
+                  type: 'Literal',
+                  value: ''
+                },
+                property: node.property
+              }
+            }
+          }
+
+          if (node.object.type === 'ArrayExpression') {
+            if (node.property.value === 'length') {
+              return {
+                type: 'Literal',
+                value: node.object.elements.length
+              };
+            }
+
+            if (typeof node.property.value === 'number') {
+              // Check for a match inside the array literal
+              var index = node.property.value >>> 0;
+              if (index === +node.property.value && index < node.object.elements.length) {
+                return node.object.elements[index];
+              }
+
+              // Optimize to an empty array literal (may still be a numeric property on Array.prototype)
+              return {
+                type: 'MemberExpression',
+                computed: true,
+                object: {
+                  type: 'ArrayExpression',
+                  elements: []
+                },
+                property: node.property
+              }
             }
           }
         }
       }
-    }
-  };
+    });
+  }
 
   function filterDeadCode(nodes) {
     return nodes.filter(function(node) {
@@ -544,100 +551,101 @@
     return nodes;
   }
 
-  var removeDeadCode = {
-    leave: function(node) {
-      if (node.type === 'Program') {
-        return {
-          type: 'Program',
-          body: hoistUseStrict(flattenNodeList(filterDeadCode(node.body)))
-        };
-      }
+  function removeDeadCode(node) {
+    return replaceWithParent(node, {
+      leave: function(node) {
+        if (node.type === 'Program') {
+          return {
+            type: 'Program',
+            body: hoistUseStrict(flattenNodeList(filterDeadCode(node.body)))
+          };
+        }
 
-      if (node.type === 'BlockStatement') {
-        var body = hoistUseStrict(flattenNodeList(filterDeadCode(node.body)));
+        if (node.type === 'BlockStatement') {
+          var body = hoistUseStrict(flattenNodeList(filterDeadCode(node.body)));
 
-        if (!parent || (parent.type !== 'FunctionExpression' && parent.type !== 'FunctionDeclaration')) {
-          if (body.length === 0) {
+          if (!parent || (parent.type !== 'FunctionExpression' && parent.type !== 'FunctionDeclaration')) {
+            if (body.length === 0) {
+              return {
+                type: 'EmptyStatement'
+              };
+            }
+
+            if (body.length === 1) {
+              return body[0];
+            }
+          }
+
+          return {
+            type: 'BlockStatement',
+            body: body
+          };
+        }
+
+        if (node.type === 'ForStatement') {
+          if (node.test !== null && node.test.type === 'Literal' && !node.test.value) {
+            if (node.init === null) {
+              return {
+                type: 'EmptyStatement'
+              };
+            }
+
+            if (node.init.type === 'VariableDeclaration') {
+              return node.init;
+            }
+
+            return {
+              type: 'ExpressionStatement',
+              expression: node.init
+            };
+          }
+        }
+
+        if (node.type === 'WhileStatement') {
+          if (node.test.type === 'Literal' && !node.test.value) {
             return {
               type: 'EmptyStatement'
             };
           }
+        }
 
-          if (body.length === 1) {
-            return body[0];
+        if (node.type === 'WithStatement') {
+          if (node.body.type === 'EmptyStatement') {
+            return {
+              type: 'ExpressionStatement',
+              expression: node.object
+            };
           }
         }
 
-        return {
-          type: 'BlockStatement',
-          body: body
-        };
-      }
-
-      if (node.type === 'ForStatement') {
-        if (node.test !== null && node.test.type === 'Literal' && !node.test.value) {
-          if (node.init === null) {
-            return {
+        if (node.type === 'IfStatement') {
+          if (node.test.type === 'Literal') {
+            return node.test.value ? node.consequent : node.alternate || {
               type: 'EmptyStatement'
             };
           }
 
-          if (node.init.type === 'VariableDeclaration') {
-            return node.init;
+          if (node.consequent.type === 'EmptyStatement' && (node.alternate === null || node.alternate.type === 'EmptyStatement')) {
+            return {
+              type: 'ExpressionStatement',
+              expression: node.test
+            };
           }
 
-          return {
-            type: 'ExpressionStatement',
-            expression: node.init
-          };
+          if (node.alternate !== null && node.alternate.type === 'EmptyStatement') {
+            return {
+              type: 'IfStatement',
+              test: node.test,
+              consequent: node.consequent,
+              alternate: null
+            };
+          }
         }
       }
-
-      if (node.type === 'WhileStatement') {
-        if (node.test.type === 'Literal' && !node.test.value) {
-          return {
-            type: 'EmptyStatement'
-          };
-        }
-      }
-
-      if (node.type === 'WithStatement') {
-        if (node.body.type === 'EmptyStatement') {
-          return {
-            type: 'ExpressionStatement',
-            expression: node.object
-          };
-        }
-      }
-
-      if (node.type === 'IfStatement') {
-        if (node.test.type === 'Literal') {
-          return node.test.value ? node.consequent : node.alternate || {
-            type: 'EmptyStatement'
-          };
-        }
-
-        if (node.consequent.type === 'EmptyStatement' && (node.alternate === null || node.alternate.type === 'EmptyStatement')) {
-          return {
-            type: 'ExpressionStatement',
-            expression: node.test
-          };
-        }
-
-        if (node.alternate !== null && node.alternate.type === 'EmptyStatement') {
-          return {
-            type: 'IfStatement',
-            test: node.test,
-            consequent: node.consequent,
-            alternate: null
-          };
-        }
-      }
-    }
-  };
+    });
+  }
 
   var parent = null;
-  var scopes = null;
 
   // Wrap the visitor in a visitor that ensures parent is set correctly
   function replaceWithParent(node, visitor) {
@@ -658,11 +666,10 @@
   }
 
   function optimize(node) {
-    scopes = escope.analyze(node).scopes;
-    node = replaceWithParent(node, normalize);
-    node = replaceWithParent(node, foldConstants);
-    node = replaceWithParent(node, removeDeadCode);
-    node = replaceWithParent(node, denormalize);
+    node = normalize(node);
+    node = foldConstants(node);
+    node = removeDeadCode(node);
+    node = denormalize(node);
     return node;
   }
 
