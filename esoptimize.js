@@ -108,18 +108,8 @@
     var node = scope.node;
 
     variables = variables.filter(function(variable) {
-      return variable.references.some(function(reference) {
-        return reference.declarationNode !== null && reference.declarationNode.type === 'VariableDeclarator';
-      });
+      return variable.isVariable() && !variable.isArgument();
     });
-
-    if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
-      variables = variables.filter(function(variable) {
-        return variable.references.every(function(reference) {
-          return node.params.indexOf(reference.node) === -1;
-        });
-      });
-    }
 
     if (variables.length === 0) {
       return {
@@ -562,7 +552,7 @@
   function canRemoveVariable(name) {
     var variable = scope.variableForName(name);
     assert(variable !== null);
-    return !variable.isGlobal() && (!variable.isReadFrom() || !variable.isWrittenTo());
+    return !variable.isGlobal() && !variable.isArgument() && (!variable.isReadFrom() || !variable.isWrittenTo());
   }
 
   function removeDeadCode(node) {
@@ -709,15 +699,25 @@
           }
         }
 
-        if (node.type === 'Identifier' && canRemoveVariable(node.name) && parent.type !== 'VariableDeclarator') {
-          return {
-            type: 'Literal',
-            value: void 0
-          };
+        if (node.type === 'Identifier' && canRemoveVariable(node.name)) {
+          var variable = scope.variableForName(node.name);
+          assert(variable !== null);
+          if (variable.referenceForNode(node).isRead) {
+            return {
+              type: 'Literal',
+              value: void 0
+            };
+          }
         }
 
         if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier' && canRemoveVariable(node.left.name)) {
           return node.right;
+        }
+
+        if (node.type === 'FunctionDeclaration' && canRemoveVariable(node.id.name)) {
+          return {
+            type: 'EmptyStatement'
+          };
         }
 
         if (node.type === 'VariableDeclaration') {
@@ -752,6 +752,7 @@
   }
 
   function wrapVisitorScope(visitor) {
+    scope = null;
     return {
       enter: function(node) {
         if (esscope.nodeStartsNewScope(node)) {

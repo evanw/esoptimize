@@ -16,8 +16,30 @@
     this.references = [];
   }
 
+  Variable.prototype.referenceForNode = function(node) {
+    for (var i = 0; i < this.references.length; i++) {
+      if (this.references[i].node === node) return this.references[i];
+    }
+    return null;
+  };
+
   Variable.prototype.isGlobal = function() {
     return this.scope.parentScope === null;
+  };
+
+  Variable.prototype.isVariable = function() {
+    return this.references.some(function(reference) {
+      var decl = reference.declarationNode;
+      return decl !== null && decl.type === 'VariableDeclarator';
+    });
+  };
+
+  Variable.prototype.isArgument = function() {
+    return this.references.some(function(reference) {
+      var decl = reference.declarationNode;
+      return decl !== null && (decl.type === 'FunctionExpression' ||
+        decl.type === 'FunctionDeclaration') && decl.params.indexOf(reference.node) >= 0;
+    });
   };
 
   Variable.prototype.isCaptured = function() {

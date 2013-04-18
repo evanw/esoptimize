@@ -303,8 +303,18 @@ it('unused variable removal', function() {
     var a, b;
     function foo(a) {
       var a, b, c;
-      a(); b();
+      a();
+      b();
     }
+    (function(a) {
+      function foo() {
+        var b, c;
+        a();
+        b();
+      }
+      function bar() {}
+      foo();
+    }());
     b = 0;
   }, function() {
     var a, b;
@@ -312,6 +322,13 @@ it('unused variable removal', function() {
       a();
       (void 0)();
     }
+    (function(a) {
+      function foo() {
+        a();
+        (void 0)();
+      }
+      foo();
+    }());
     b = 0;
   });
 });
