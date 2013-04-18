@@ -217,10 +217,13 @@
         };
       }
 
-      if (node.type === 'ForStatement' && node.init !== null && node.init.type === 'EmptyStatement') {
+      if (node.type === 'ForStatement' && node.init !== null) {
         return {
           type: 'ForStatement',
-          init: null,
+          init:
+            node.init.type === 'EmptyStatement' ? null :
+            node.init.type === 'ExpressionStatement' ? node.init.expression :
+            node.init,
           test: node.test,
           update: node.update,
           body: node.body

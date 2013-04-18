@@ -342,11 +342,13 @@ it('for statement dead code removal', function() {
     for (;0;) foo();
     for (foo();0;) foo();
     for (var bar;0;) foo();
+    for (var bar = 0;0;) foo();
     for (;1;) foo();
     for (;;) foo();
   }, function() {
     var bar;
     foo();
+    bar = 0;
     for (;1;) foo();
     for (;;) foo();
   });
