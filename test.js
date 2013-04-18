@@ -305,12 +305,17 @@ it('ternary expression folding', function() {
   });
 });
 
-it('remove empty if body', function() {
+it('if statement dead code removal', function() {
   test(function() {
+    if (0) a();
+    if (0) a(); else b();
+    if (1) a(); else b();
     if (a()) { b(); } else {}
     if (a()) { 1; }
     if (a()) { 1; } else { 2; }
   }, function() {
+    b();
+    a();
     if (a()) b();
     a();
     a();
@@ -338,5 +343,14 @@ it('for statement dead code removal', function() {
     var bar;
     for (;1;) foo();
     for (;;) foo();
+  });
+});
+
+it('with statement dead code removal', function() {
+  test(function() {
+    with (foo) {}
+    with (foo) foo();
+  }, function() {
+    with (foo) foo();
   });
 });

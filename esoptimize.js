@@ -483,9 +483,20 @@
         }
       }
 
+      if (node.type === 'WithStatement') {
+        if (node.body.type === 'EmptyStatement') {
+          return {
+            type: 'ExpressionStatement',
+            expression: node.object
+          };
+        }
+      }
+
       if (node.type === 'IfStatement') {
         if (node.test.type === 'Literal') {
-          return node.test.value ? node.consequent : node.alternate;
+          return node.test.value ? node.consequent : node.alternate || {
+            type: 'EmptyStatement'
+          };
         }
 
         if (node.consequent.type === 'EmptyStatement' && (node.alternate === null || node.alternate.type === 'EmptyStatement')) {
