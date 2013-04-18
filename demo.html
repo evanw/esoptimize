@@ -85,7 +85,7 @@ var y = [1, 2, 3]['len' + 'gth'];
           node = esoptimize.optimize(node);
           output.setValue(escodegen.generate(node, { format: { indent: { style: '  ' } } }) + '\n');
         } catch (e) {
-          output.setValue(e.stack + '');
+          output.setValue((e.stack || e) + '');
         }
       }
 

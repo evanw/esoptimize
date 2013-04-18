@@ -316,3 +316,27 @@ it('remove empty if body', function() {
     a();
   });
 });
+
+it('while statement dead code removal', function() {
+  test(function() {
+    while (false) foo();
+    while (true) foo();
+  }, function() {
+    while (true) foo();
+  });
+});
+
+it('for statement dead code removal', function() {
+  test(function() {
+    for (;0;) foo();
+    for (foo();0;) foo();
+    for (var bar;0;) foo();
+    for (;1;) foo();
+    for (;;) foo();
+  }, function() {
+    foo();
+    var bar;
+    for (;1;) foo();
+    for (;;) foo();
+  });
+});

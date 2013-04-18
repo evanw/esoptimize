@@ -456,6 +456,33 @@
         };
       }
 
+      if (node.type === 'ForStatement') {
+        if (node.test !== null && node.test.type === 'Literal' && !node.test.value) {
+          if (node.init === null) {
+            return {
+              type: 'EmptyStatement'
+            };
+          }
+
+          if (node.init.type === 'VariableDeclaration') {
+            return node.init;
+          }
+
+          return {
+            type: 'ExpressionStatement',
+            expression: node.init
+          };
+        }
+      }
+
+      if (node.type === 'WhileStatement') {
+        if (node.test.type === 'Literal' && !node.test.value) {
+          return {
+            type: 'EmptyStatement'
+          };
+        }
+      }
+
       if (node.type === 'IfStatement') {
         if (node.test.type === 'Literal') {
           return node.test.value ? node.consequent : node.alternate;
