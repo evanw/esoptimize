@@ -23,10 +23,11 @@ it('numeric constants', function() {
     var c = 100 / 0 * -2;
     var d = -0;
   }, function() {
-    var a = 0 / 0;
-    var b = 1 / 0;
-    var c = -1 / 0;
-    var d = 0;
+    var a, b, c, d;
+    a = 0 / 0;
+    b = 1 / 0;
+    c = -1 / 0;
+    d = 0;
   });
 });
 
@@ -148,9 +149,10 @@ it('sequence folding', function() {
     var b = (1, x(), 2, y(), 3);
     var c = (1, (x(), 2), 3);
   }, function() {
-    var a = 3;
-    var b = (x(), y(), 3);
-    var c = (x(), 3);
+    var a, b, c;
+    a = 3;
+    b = (x(), y(), 3);
+    c = (x(), 3);
   });
 });
 
@@ -192,11 +194,12 @@ it('array folding', function() {
     var d = [1, 2][0.5];
     var e = [1, 2, 3]['len' + 'gth'];
   }, function() {
-    var a = 1;
-    var b = [1, c()][0];
-    var c = [][-1];
-    var d = [][0.5];
-    var e = 3;
+    var a, b, c, d, e;
+    a = 1;
+    b = [1, c()][0];
+    c = [][-1];
+    d = [][0.5];
+    e = 3;
   });
 });
 
@@ -207,10 +210,11 @@ it('string folding', function() {
     var c = '12'[0.5];
     var d = '123'['len' + 'gth'];
   }, function() {
-    var a = '1';
-    var b = ''[-1];
-    var c = ''[0.5];
-    var d = 3;
+    var a, b, c, d;
+    a = '1';
+    b = ''[-1];
+    c = ''[0.5];
+    d = 3;
   });
 });
 
@@ -220,9 +224,10 @@ it('object literal folding', function() {
     var b = { 'x': 0, 'y': 1 }.x;
     var c = { 1: 2, 3: 4 }[1];
   }, function() {
-    var a = 0;
-    var b = 0;
-    var c = 2;
+    var a, b, c;
+    a = 0;
+    b = 0;
+    c = 2;
   });
 });
 
@@ -240,17 +245,19 @@ it('property normalization', function() {
 
 it('side-effect-free code removal', function() {
   test(function() {
+    'use strict';
+    if (false) var x;
+    'not use strict';
     1;
     x;
     x.y;
     (function() {});
-    'use strict';
-    'not use strict';
     var foo = function() {};
     function foo() {}
   }, function() {
     'use strict';
-    var foo = function() {};
+    var x, foo;
+    foo = function() {};
     function foo() {}
   });
 });
@@ -263,8 +270,7 @@ it('block flattening', function() {
     { ; b(); { c(); } d(), e(); }
     f();
   }, function() {
-    var x;
-    var y;
+    var x, y;
     a();
     b();
     c();
@@ -276,7 +282,7 @@ it('block flattening', function() {
 
 it('function block flattening', function() {
   test(function() {
-    function foo() {
+    function foo(a, b) {
       var x, y;
       a();
       ;
@@ -284,9 +290,9 @@ it('function block flattening', function() {
       f();
     }
   }, function() {
-    function foo() {
-      var x;
-      var y;
+    var foo;
+    function foo(a, b) {
+      var x, y;
       a();
       b();
       c();
@@ -339,8 +345,8 @@ it('for statement dead code removal', function() {
     for (;1;) foo();
     for (;;) foo();
   }, function() {
-    foo();
     var bar;
+    foo();
     for (;1;) foo();
     for (;;) foo();
   });

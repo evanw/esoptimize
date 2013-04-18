@@ -1,6 +1,7 @@
 (function() {
   'use strict';
 
+  var escope = typeof window !== 'undefined' ? window.escope : require('escope');
   var estraverse = typeof window !== 'undefined' ? window.estraverse : require('estraverse');
   var esoptimize = typeof window !== 'undefined' ? (window.esoptimize = {}) : exports;
 
@@ -99,8 +100,71 @@
     return true;
   }
 
+  function declareScopeVariables(node) {
+    for (var i = 0; i < scopes.length; i++) {
+      if (scopes[i].block === node) {
+        var variables = scopes[i].variables;
+
+        if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
+          variables = variables.filter(function(variable) {
+            return variable.name !== 'arguments' && node.params.every(function(param) {
+              return param.name !== variable.name;
+            });
+          });
+        }
+
+        if (variables.length === 0) {
+          return {
+            type: 'EmptyStatement'
+          };
+        }
+
+        return {
+          type: 'VariableDeclaration',
+          declarations: variables.map(function(variable) {
+            return {
+              type: 'VariableDeclarator',
+              id: {
+                type: 'Identifier',
+                name: variable.name
+              },
+              init: null
+            };
+          }),
+          kind: 'var'
+        };
+      }
+    }
+    assert(false);
+  }
+
   var normalize = {
     leave: function(node) {
+      // Hoist global variables
+      if (node.type === 'Program') {
+        return {
+          type: 'Program',
+          body: [declareScopeVariables(node)].concat(node.body)
+        };
+      }
+
+      // Hoist local variables
+      if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
+        return {
+          type: node.type,
+          id: node.id,
+          params: node.params,
+          defaults: node.defaults,
+          body: {
+            type: 'BlockStatement',
+            body: [declareScopeVariables(node)].concat(node.body.body)
+          },
+          rest: node.rest,
+          generator: node.generator,
+          expression: node.expression
+        };
+      }
+
       if (node.type === 'Property') {
         assert(node.key.type === 'Literal' || node.key.type === 'Identifier');
         return {
@@ -123,6 +187,43 @@
             type: 'Literal',
             value: node.property.name
           }
+        };
+      }
+
+      if (node.type === 'VariableDeclaration') {
+        var expressions = node.declarations.filter(function(node) {
+          return node.init !== null;
+        }).map(function(node) {
+          return {
+            type: 'AssignmentExpression',
+            operator: '=',
+            left: node.id,
+            right: node.init
+          }
+        });
+
+        if (expressions.length === 0) {
+          return {
+            type: 'EmptyStatement'
+          };
+        }
+
+        return {
+          type: 'ExpressionStatement',
+          expression: {
+            type: 'SequenceExpression',
+            expressions: expressions
+          }
+        };
+      }
+
+      if (node.type === 'ForStatement' && node.init !== null && node.init.type === 'EmptyStatement') {
+        return {
+          type: 'ForStatement',
+          init: null,
+          test: node.test,
+          update: node.update,
+          body: node.body
         };
       }
     }
@@ -399,16 +500,6 @@
         return node.body;
       }
 
-      if (node.type === 'VariableDeclaration') {
-        return node.declarations.map(function(decl) {
-          return {
-            type: 'VariableDeclaration',
-            declarations: [decl],
-            kind: node.kind
-          }
-        });
-      }
-
       if (node.type === 'ExpressionStatement' && node.expression.type === 'SequenceExpression') {
         return flattenNodeList(node.expression.expressions).map(function(node) {
           return {
@@ -426,17 +517,41 @@
     }));
   }
 
+  function hoistUseStrict(nodes) {
+    var useStrict = false;
+
+    nodes = nodes.filter(function(node) {
+      if (node.type === 'ExpressionStatement' && node.expression.type === 'Literal' && node.expression.value === 'use strict') {
+        useStrict = true;
+        return false;
+      }
+      return true;
+    });
+
+    if (useStrict) {
+      return [{
+        type: 'ExpressionStatement',
+        expression: {
+          type: 'Literal',
+          value: 'use strict'
+        }
+      }].concat(nodes);
+    }
+
+    return nodes;
+  }
+
   var removeDeadCode = {
     leave: function(node) {
       if (node.type === 'Program') {
         return {
           type: 'Program',
-          body: flattenNodeList(filterDeadCode(node.body))
+          body: hoistUseStrict(flattenNodeList(filterDeadCode(node.body)))
         };
       }
 
       if (node.type === 'BlockStatement') {
-        var body = flattenNodeList(filterDeadCode(node.body));
+        var body = hoistUseStrict(flattenNodeList(filterDeadCode(node.body)));
 
         if (!parent || (parent.type !== 'FunctionExpression' && parent.type !== 'FunctionDeclaration')) {
           if (body.length === 0) {
@@ -519,6 +634,7 @@
   };
 
   var parent = null;
+  var scopes = null;
 
   // Wrap the visitor in a visitor that ensures parent is set correctly
   function replaceWithParent(node, visitor) {
@@ -539,6 +655,7 @@
   }
 
   function optimize(node) {
+    scopes = escope.analyze(node).scopes;
     node = replaceWithParent(node, normalize);
     node = replaceWithParent(node, foldConstants);
     node = replaceWithParent(node, removeDeadCode);
