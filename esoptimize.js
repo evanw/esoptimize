@@ -648,6 +648,20 @@
           };
         }
 
+        if (node.type === 'SwitchStatement' && (!node.cases || node.cases.length === 0)) {
+          return {
+            type: 'ExpressionStatement',
+            expression: node.discriminant
+          };
+        }
+
+        if (node.type === 'ReturnStatement' && node.argument !== null && node.argument.type === 'Literal' && node.argument.value === void 0) {
+          return {
+            type: 'ReturnStatement',
+            argument: null
+          };
+        }
+
         if (node.type === 'WhileStatement') {
           if (node.test.type === 'Literal' && !node.test.value) {
             return {

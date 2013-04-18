@@ -415,3 +415,22 @@ it('try statement dead code removal', function() {
     foo();
   });
 });
+
+it('return statement folding', function() {
+  test(function() {
+    function foo() { if (bar()) return void 0; bar(); }
+    function foo() { var x; if (bar()) return x; bar(); }
+  }, function() {
+    function foo() { if (bar()) return; bar(); }
+    function foo() { if (bar()) return; bar(); }
+  });
+});
+
+it('switch statement dead code removal', function() {
+  test(function() {
+    switch (0) {}
+    switch (foo()) {}
+  }, function() {
+    foo();
+  });
+});
